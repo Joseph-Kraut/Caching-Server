@@ -1,8 +1,12 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
 #include <sys/socket.h>
 #include <netinet/in.h>
 
 #include "server.h"
+#include "server_utils.h"
 
 int main(int argc, char *argv[])
 {
@@ -16,8 +20,8 @@ int main(int argc, char *argv[])
 int start_tcp_server()
 {
     int socket_fd, conn_fd;
-    struct sockaddr_in socket_address;
-    socklen_t socket_length;
+    struct sockaddr_in socket_address, client_addr;
+    socklen_t socket_length, client_addr_length = sizeof(client_addr);
 
     // Allocate a socket
     if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -45,7 +49,7 @@ int start_tcp_server()
 
     // Accept connections in loop
     while (1) {
-        if ((conn_fd = accept(socket_fd, (struct sockaddr *)&socket_address, &socket_length)) == -1) {
+        if ((conn_fd = accept(socket_fd, (struct sockaddr *)&client_addr, &client_addr_length)) == -1) {
             perror("error awaiting socket connections");
             return -1;
         }
@@ -53,11 +57,34 @@ int start_tcp_server()
         // Forward the request to the handler
         handler(conn_fd);
     }
-
-    return 0;
 }
+
+
+/**
+ * REQUEST HANDLERS
+ */
 
 int handler(int connection_fd)
 {
-    printf("Got conection with file descriptor: %d\n", connection_fd);
+    char *request_buffer = malloc(MAX_REQUEST_LENGTH);
+    request_t *request = malloc(sizeof(request_t));
+
+    // Read the request and parse it into struct
+    if (read(connection_fd, request_buffer, MAX_REQUEST_LENGTH) == 0) {
+        perror("error reading from connection");
+        goto error;
+    }
+
+    // Parse the request
+    if (parse_request(request_buffer, request)) {
+        perror("error parsing request...");
+        goto error;
+    }
+
+    printf("Got request with \n\tkey: %s\n\tvalue: %s\n", request->key, request->value);
+
+error:
+    free(request);
+    free(request_buffer);
+    return -1;
 }
