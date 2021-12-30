@@ -5,57 +5,50 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+#include "kv_store.h"
 #include "server.h"
 #include "server_utils.h"
 
-int main(int argc, char *argv[])
+/**
+ * SERVER INTERFACE
+ */
+// Allocates the server and its data structures
+kv_server_t *create_server()
 {
-    // TODO create a thread pool for serving
+    kv_server_t *server = malloc(sizeof(kv_server_t));
 
-    // Start a TCP server
-    return start_tcp_server();
+    // Open a socket and start kv store
+    if ((server->socket_fd = create_socket()) == -1) {
+        return 0x0;
+    }
+    server->kv_store = create_kv_store();
+
+    return server;
 }
 
-// Server connection handler
-int start_tcp_server()
+// Frees the memory backing the server and its data structures
+void free_server(kv_server_t *server)
 {
-    int socket_fd, conn_fd;
-    struct sockaddr_in socket_address, client_addr;
-    socklen_t socket_length, client_addr_length = sizeof(client_addr);
+    close(server->socket_fd);
+    free_kv_store(server->kv_store);
+}
 
-    // Allocate a socket
-    if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        perror("error creating socket");
-        return -1;
-    }
-
-    // Bind to an address
-    socket_address.sin_family = AF_INET;
-    socket_address.sin_port = htons(PORT);
-    socket_address.sin_addr.s_addr = INADDR_ANY;
-
-    socket_length = sizeof(socket_address);
-
-    if (bind(socket_fd, (struct sockaddr *)&socket_address, socket_length)) {
-        perror("error binding socket to address");
-        return -1;
-    }
-
-    // Listen for connections
-    if (listen(socket_fd, MAX_TCP_QUEUE)) {
-        perror("error marking socket as passive");
-        return -1;
-    }
+// Server event listener
+int listen_and_serve(kv_server_t *server)
+{
+    int conn_fd;
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_length = sizeof(client_addr);
 
     // Accept connections in loop
     while (1) {
-        if ((conn_fd = accept(socket_fd, (struct sockaddr *)&client_addr, &client_addr_length)) == -1) {
+        if ((conn_fd = accept(server->socket_fd, (struct sockaddr *)&client_addr, &client_addr_length)) == -1) {
             perror("error awaiting socket connections");
             return -1;
         }
 
         // Forward the request to the handler
-        handler(conn_fd);
+        handler(server, conn_fd);
     }
 }
 
@@ -64,7 +57,20 @@ int start_tcp_server()
  * REQUEST HANDLERS
  */
 
-int handler(int connection_fd)
+int handle_get_request(kv_server_t *server, int connection_fd, request_t *request)
+{
+    const char *value = kv_get(server->kv_store, request->key);
+    printf("Get with key: %s value: %s\n", request->key, value);
+    return 0;
+}
+
+int handle_set_request(kv_server_t *server, int connection_fd, request_t *request)
+{
+    const char *old_value = kv_set(server->kv_store, request->key, request->value);
+    printf("SET(%s, %s) = %s\n", request->key, request->value, old_value);
+}
+
+int handler(kv_server_t *server, int connection_fd)
 {
     char *request_buffer = malloc(MAX_REQUEST_LENGTH);
     request_t *request = malloc(sizeof(request_t));
@@ -81,10 +87,36 @@ int handler(int connection_fd)
         goto error;
     }
 
-    printf("Got request with \n\tkey: %s\n\tvalue: %s\n", request->key, request->value);
+    switch (request->op_type) {
+    case GET:
+        return handle_get_request(server, connection_fd, request);
+    case SET:
+        return handle_set_request(server, connection_fd, request);
+    default:
+        perror("unsupported operation\n");
+        goto error;
+    }
 
 error:
     free(request);
     free(request_buffer);
     return -1;
+}
+
+
+/**
+ * SERVER ENTRYPOINT
+ */
+
+int main(int argc, char *argv[])
+{
+    // Allocate the server and start it
+    kv_server_t *server = create_server();
+    if(listen_and_serve(server)) {
+        perror("server error");
+        exit(EXIT_FAILURE);
+    }
+
+    free_server(server);
+    return 0;
 }

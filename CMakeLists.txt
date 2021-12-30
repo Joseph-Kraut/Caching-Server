@@ -7,12 +7,17 @@ set(
         SERVER_SOURCES
         src/server/server.c
         src/server/server_utils.c
-        src/hashmap/hashmap.c
+        src/server/kv_store.c
+        hashmap/hashmap.c
         include/types.h
 )
 
 add_executable(server ${SERVER_SOURCES})
-target_include_directories(server PRIVATE include)
+target_include_directories(
+        server PRIVATE
+        include
+        hashmap
+)
 
 # Client executable
 set(

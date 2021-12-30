@@ -9,5 +9,6 @@
 
 // Utils interface
 int parse_request(char *, request_t *);
+int create_socket();
 
 #endif //CACHING_SERVER_SERVER_UTILS_H

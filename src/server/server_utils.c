@@ -5,10 +5,56 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 #include "server_utils.h"
 
+/**
+ * SERVER CREATION HELPERS
+ */
 
+int create_socket()
+{
+    int socket_fd;
+    struct sockaddr_in socket_address;
+    socklen_t socket_length;
+
+    // Allocate a socket
+    if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("error creating socket");
+        return -1;
+    }
+
+    // Bind to an address
+    socket_address.sin_family = AF_INET;
+    socket_address.sin_port = htons(PORT);
+    socket_address.sin_addr.s_addr = INADDR_ANY;
+
+    socket_length = sizeof(socket_address);
+
+    if (bind(socket_fd, (struct sockaddr *)&socket_address, socket_length)) {
+        perror("error binding socket to address");
+        goto error;
+    }
+
+    // Listen for connections
+    if (listen(socket_fd, MAX_TCP_QUEUE)) {
+        perror("error marking socket as passive");
+        goto error;
+    }
+
+    return socket_fd;
+    error:
+    close(socket_fd);
+    return -1;
+}
+
+/**
+ * REQUEST PARSING
+ */
 int parse_get_request(char *request_buffer, request_t *result)
 {
     result->op_type = GET;
