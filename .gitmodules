@@ -1,0 +1,3 @@
+[submodule "src/hashmap.c"]
+	path = src/hashmap
+	url = https://github.com/tidwall/hashmap.c.git

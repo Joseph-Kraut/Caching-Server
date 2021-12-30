@@ -7,6 +7,7 @@ set(
         SERVER_SOURCES
         src/server/server.c
         src/server/server_utils.c
+        src/hashmap/hashmap.c
         include/types.h
 )
 
