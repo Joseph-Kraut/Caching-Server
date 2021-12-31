@@ -58,9 +58,9 @@ int create_socket()
 int parse_get_request(char *request_buffer, request_t *result)
 {
     result->op_type = GET;
-    // First byte -> opcode
+    // First few bytes are the opcode
     // Rest of the bytes in GET are a string
-    char *cursor = request_buffer + 1;
+    char *cursor = request_buffer + sizeof(result->op_type);
     result->key = cursor;
 
     return 0;

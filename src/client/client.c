@@ -13,7 +13,8 @@
 #include "client.h"
 #include "types.h"
 
-int send_request(int socket_fd, request_t *request) {
+int send_request(int socket_fd, request_t *request)
+{
     // Allocate a buffer for the request
     size_t key_size = strlen(request->key) + 1, val_size = strlen(request->value) + 1;
     size_t message_size = sizeof(request->op_type) + key_size + val_size;
@@ -27,15 +28,36 @@ int send_request(int socket_fd, request_t *request) {
     // Send the request
     if (write(socket_fd, message_buffer, message_size) != message_size) {
         perror("error sending message");
+        free(message_buffer);
         return -1;
     }
+
+    free(message_buffer);
+    return 0;
+}
+
+int parse_response(char *response_buffer, response_t *result)
+{
+    // Unmarshall the response into the passed value
+    void *cursor = response_buffer;
+    result->response_status = *((uint8_t *) cursor);
+    cursor += sizeof(result->response_status);
+
+    result->key = cursor;
+    cursor += strlen(result->key) + 1;
+
+    result->value = cursor;
+    cursor += strlen(result->value) + 1;
+
+    result->error_string = cursor;
 
     return 0;
 }
 
-int main(int argc, char *argv[]) {
-    if (argc < 4) {
-        perror("Usage: ./client <server_ip> <key> <value>");
+int main(int argc, char *argv[])
+{
+    if (argc < 5) {
+        perror("Usage: ./client <server_ip> <command> <key> <value>");
         exit(EXIT_FAILURE);
     }
 
@@ -43,7 +65,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in server_addr;
     socklen_t server_addr_length = sizeof(server_addr);
 
-    char *server_ip = argv[1], *key = argv[2], *value = argv[3];
+    char *server_ip = argv[1], *command = argv[2], *key = argv[3], *value = argv[4];
 
     // Create a socket for messaging
     if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -63,7 +85,7 @@ int main(int argc, char *argv[]) {
 
     // Write to address
     request_t req = {
-            .op_type = GET,
+            .op_type = !strcmp(command, "GET") ? GET : SET,
             .key = key,
             .value = value,
     };
@@ -73,5 +95,20 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    // Read response from socket
+    char *response_buffer = malloc(MAX_RESPONSE_SIZE);
+    if (read(socket_fd, response_buffer, MAX_RESPONSE_SIZE) == -1) {
+        perror("error reading response from socket");
+        return -1;
+    }
+
+    response_t response;
+    if (parse_response(response_buffer, &response)) {
+        perror("error parsing response");
+    }
+
+    printf("Got server response:\n\tkey: %s\n\tvalue: %s\n\terror_string: %s\n", response.key, response.value, response.error_string);
+
+    free(response_buffer);
     return 0;
 }
