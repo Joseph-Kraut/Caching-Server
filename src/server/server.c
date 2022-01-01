@@ -9,6 +9,7 @@
 #include "kv_store.h"
 #include "server.h"
 #include "server_utils.h"
+#include "thread_pool.h"
 
 /**
  * SERVER INTERFACE
@@ -24,6 +25,12 @@ kv_server_t *create_server()
     }
     server->kv_store = create_kv_store();
 
+    // Create a thread pool
+    if ((server->thread_pool = create_thread_pool(THREAD_POOL_SIZE, WORK_QUEUE_LENGTH)) == NULL) {
+        perror("error creating thread pool");
+        exit(EXIT_FAILURE);
+    }
+
     return server;
 }
 
@@ -32,11 +39,15 @@ void free_server(kv_server_t *server)
 {
     close(server->socket_fd);
     free_kv_store(server->kv_store);
+    free_thread_pool(server->thread_pool);
 }
 
 // Server event listener
 int listen_and_serve(kv_server_t *server)
 {
+    // Start the worker pool
+    start_thread_pool(server->thread_pool);
+
     int conn_fd;
     struct sockaddr_in client_addr;
     socklen_t client_addr_length = sizeof(client_addr);
@@ -49,7 +60,17 @@ int listen_and_serve(kv_server_t *server)
         }
 
         // Forward the request to the handler
-        handler(server, conn_fd);
+        request_task_args_t *args = malloc(sizeof(request_task_args_t));
+        args->connection_fd = conn_fd;
+        args->store = server->kv_store;
+
+        task_t *request_task = malloc(sizeof(task_t));
+        request_task->args = args;
+        request_task->fun = &handler;
+
+        if (enqueue_task(server->thread_pool, request_task)) {
+            perror("error enqueuing task");
+        }
     }
 }
 
@@ -93,10 +114,10 @@ int send_response(int connection_fd, response_t *response) {
     return 0;
 }
 
-int handle_get_request(kv_server_t *server, int connection_fd, request_t *request)
+int handle_get_request(kv_store_t *store, int connection_fd, request_t *request)
 {
     // Fetch from in memory map
-    const char *value = kv_get(server->kv_store, request->key);
+    const char *value = kv_get(store, request->key);
     printf("GET(%s) = %s\n", request->key, value);
 
     // Build a response
@@ -110,9 +131,9 @@ int handle_get_request(kv_server_t *server, int connection_fd, request_t *reques
     return send_response(connection_fd, &response);
 }
 
-int handle_set_request(kv_server_t *server, int connection_fd, request_t *request)
+int handle_set_request(kv_store_t *store, int connection_fd, request_t *request)
 {
-    const char *old_value = kv_set(server->kv_store, request->key, request->value);
+    const char *old_value = kv_set(store, request->key, request->value);
     printf("SET(%s, %s) = %s\n", request->key, request->value, old_value);
 
     // Build a response
@@ -126,37 +147,43 @@ int handle_set_request(kv_server_t *server, int connection_fd, request_t *reques
     return send_response(connection_fd, &response);
 }
 
-int handler(kv_server_t *server, int connection_fd)
+void handler(void *args)
 {
+    request_task_args_t *request_args = args;
     char *request_buffer = malloc(MAX_REQUEST_LENGTH);
     request_t *request = malloc(sizeof(request_t));
 
     // Read the request and parse it into struct
-    if (read(connection_fd, request_buffer, MAX_REQUEST_LENGTH) == 0) {
+    if (read(request_args->connection_fd, request_buffer, MAX_REQUEST_LENGTH) <= 0) {
         perror("error reading from connection");
-        goto error;
+        goto cleanup;
     }
 
     // Parse the request
     if (parse_request(request_buffer, request)) {
         perror("error parsing request...");
-        goto error;
+        goto cleanup;
     }
 
     switch (request->op_type) {
     case GET:
-        return handle_get_request(server, connection_fd, request);
+        if (handle_get_request(request_args->store, request_args->connection_fd, request)) {
+            perror("error handling get request");
+        }
+        break;
     case SET:
-        return handle_set_request(server, connection_fd, request);
+        if (handle_set_request(request_args->store, request_args->connection_fd, request)) {
+            perror("error handling set request");
+        }
+        break;
     default:
         perror("unsupported operation\n");
-        goto error;
     }
 
-error:
+cleanup:
+    close(request_args->connection_fd);
     free(request);
     free(request_buffer);
-    return -1;
 }
 
 

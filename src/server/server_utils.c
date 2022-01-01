@@ -47,7 +47,7 @@ int create_socket()
     }
 
     return socket_fd;
-    error:
+error:
     close(socket_fd);
     return -1;
 }

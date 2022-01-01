@@ -62,6 +62,7 @@ const char *kv_get(kv_store_t *store, const char *key)
 // Set the value of the given key to the given value
 const char *kv_set(kv_store_t *store, const char *key, const char *value)
 {
+    printf("Got to kv_set\n");
     // Construct a kv pair
     kv_pair_t pair = {
             .key = key,

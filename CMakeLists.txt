@@ -8,6 +8,7 @@ set(
         src/server/server.c
         src/server/server_utils.c
         src/server/kv_store.c
+        src/server/thread_pool.c
         hashmap/hashmap.c
         include/types.h
 )
