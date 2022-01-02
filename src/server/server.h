@@ -5,7 +5,7 @@
 #ifndef CACHING_SERVER_SERVER_H
 #define CACHING_SERVER_SERVER_H
 
-#include "kv_store.h"
+#include "../kv_store/kv_store.h"
 #include "thread_pool.h"
 
 #ifndef PORT
@@ -21,7 +21,7 @@
 #endif //MAX_REQUEST_LENGTH
 
 #ifndef THREAD_POOL_SIZE
-#define THREAD_POOL_SIZE 2
+#define THREAD_POOL_SIZE 30
 #endif //THEAD_POOL_SIZE
 
 #ifndef WORK_QUEUE_LENGTH

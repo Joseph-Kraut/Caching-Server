@@ -117,8 +117,13 @@ void free_thread_pool(thread_pool_t *thread_pool)
 
     // Free work queue
     free(thread_pool->work_queue->tasks);
+
+    pthread_cond_destroy(thread_pool->work_queue->work_ready);
     free(thread_pool->work_queue->work_ready);
+
+    pthread_mutex_destroy(thread_pool->work_queue->mu);
     free(thread_pool->work_queue->mu);
+
     free(thread_pool->work_queue);
 
     // Finally, free the thread pool

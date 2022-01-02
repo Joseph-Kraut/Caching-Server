@@ -7,9 +7,11 @@
 #define CACHING_SERVER_KV_STORE_H
 
 #include "hashmap.h"
+#include "lock_manager.h"
 
 typedef struct kv_store {
     struct hashmap *map;
+    lock_manager_t *lock_manager;
 } kv_store_t;
 
 typedef struct kv_pair {

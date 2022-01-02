@@ -7,7 +7,8 @@ set(
         SERVER_SOURCES
         src/server/server.c
         src/server/server_utils.c
-        src/server/kv_store.c
+        src/kv_store/kv_store.c
+        src/kv_store/lock_manager.c
         src/server/thread_pool.c
         hashmap/hashmap.c
         include/types.h
@@ -18,6 +19,7 @@ target_include_directories(
         server PRIVATE
         include
         hashmap
+        src/kv_store
 )
 
 # Client executable

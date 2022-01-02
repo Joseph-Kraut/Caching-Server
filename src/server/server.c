@@ -6,7 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include "kv_store.h"
+#include "../kv_store/kv_store.h"
 #include "server.h"
 #include "server_utils.h"
 #include "thread_pool.h"
