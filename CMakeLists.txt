@@ -31,3 +31,25 @@ set(
 
 add_executable(client ${CLIENT_SOURCES})
 target_include_directories(client PRIVATE include)
+
+# Testing executable
+set(
+        TEST_SOURCES
+        src/test/test_all.c
+        src/test/helpers.c
+        src/test/kv_store/test_kv_store.c
+
+        hashmap/hashmap.c
+        src/kv_store/kv_store.c
+        src/kv_store/lock_manager.c
+)
+
+add_executable(test ${TEST_SOURCES})
+target_include_directories(
+        test PRIVATE
+        include
+        hashmap
+        src/test
+        src/kv_store
+)
+
