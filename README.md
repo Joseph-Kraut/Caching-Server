@@ -2,6 +2,7 @@
 A caching server built for learning purposes.
 
 # TODO
-- ~~Implement Basic Functionality~~
-- Multithreading on server
-- Fault tolerance via RAFT
+- [x] Implement Basic Functionality
+- [x] Multithreading on server
+- [] Test Coverage
+- [] Fault tolerance via RAFT
